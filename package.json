@@ -1,0 +1,15 @@
+{
+    "private": true,
+    "name": "retry",
+    "version": "0.0.1",
+    "description": "",
+    "author": "Alexander I. Antipin <antipin@textkernel.nl>",
+    "license": "MIT",
+    "main": "src/retry.ts",
+    "scripts": {
+        "start": "tsc && node ./build/MyWonkyClass.test.js"
+    },
+    "devDependencies": {
+        "typescript": "^4.7.4"
+    }
+}
