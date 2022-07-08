@@ -1,14 +1,21 @@
-// Generic part
-
-type RetryableFn<Args extends Array<unknown>, Res> = (...args: Args) => Promise<Res>
+type RetryTimeoutFn = (retryAttempt: number) => number;
 
 type RetryOptions = {
     maxRetries?: number;
     timeout?: number;
+    retryTimeout?: number | RetryTimeoutFn;
+    RetryableErrorClass?: any;
 }
 
+type RetryableFn<Args extends Array<unknown>, Res> = (...args: Args) => Promise<Res>
+
 export function makeRetryable<Args extends Array<unknown>, Res>(fn: RetryableFn<Args, Res>, retryOptions: RetryOptions) {
-    const { maxRetries = 3, timeout = 10_000 } = retryOptions;
+    const {
+        maxRetries = 3,
+        timeout = 10_000,
+        retryTimeout = 0,
+        RetryableErrorClass = Error,
+    } = retryOptions;
     return function (...args: Args): Promise<Res> {
         return new Promise((resolve, reject) => {
 
@@ -17,17 +24,18 @@ export function makeRetryable<Args extends Array<unknown>, Res>(fn: RetryableFn<
             let isTimeoutExpired = false;
             const timeoutCountdown = setTimeout(() => { isTimeoutExpired = true; }, timeout);
 
-            let retriesCount = 0
+            let retriesCount = 0;
             
             async function retryFn(...args: Args) {
                 retriesCount += 1;
                 if (isTimeoutExpired === true) {
                     clearTimeout(timeoutCountdown);
                     console.log('Max amount of retires has exceeded');
-                    return reject(lastError);
+                    return reject(new Error('Retry timeout'));
                 }
                 if (retriesCount > maxRetries) {
                     clearTimeout(timeoutCountdown);
+                    console.log('Retry timeout has expired');
                     return reject(lastError);
                 }
                 try {
@@ -38,7 +46,21 @@ export function makeRetryable<Args extends Array<unknown>, Res>(fn: RetryableFn<
                 } catch(err) {
                     console.log(`retry #${retriesCount} returned error:`, err);
                     lastError = err;
-                    retryFn(...args);
+                    // Checking if the given error requires a retry
+                    if (err instanceof RetryableErrorClass) {
+                        // Calculating retry timeout
+                        let waitForBeforeRetry = 0;
+                        if (typeof retryTimeout === 'function') {
+                            waitForBeforeRetry = retryTimeout(retriesCount);
+                        } else {
+                            waitForBeforeRetry = retryTimeout;
+                        }
+                        console.log(`waiting for ${waitForBeforeRetry}ms before retry`);
+                        setTimeout(() => retryFn(...args), waitForBeforeRetry);
+                    } else {
+                        console.log(`wrapped function returned non-retryable error`, lastError);
+                        return reject(lastError);
+                    }
                 }
             }
             return retryFn(...args);

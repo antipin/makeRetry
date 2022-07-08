@@ -1,19 +1,21 @@
 import { makeRetryable } from './makeRetryable';
 
-type MyRequestArgs = [string, string];
+export class RetryableError extends Error {};
 
 export class MyWonkyClass {
 
-    private attempts = 0;
+    private attempts = 1;
 
     /**
      * In constructor we wrap and reassign `this.doSomethingWonky`
      * into `makeRetryable` function.
      */
     constructor(maxRetries: number, timeout: number) {
-        this.doSomethingWonky = makeRetryable<MyRequestArgs, string>(this.doSomethingWonky, {
+        this.doSomethingWonky = makeRetryable<[string, string], string>(this.doSomethingWonky, {
             maxRetries,
-            timeout
+            timeout,
+            retryTimeout: (retryAttempt) => retryAttempt * 100,
+            RetryableErrorClass: RetryableError,
         });
     }
 
@@ -29,8 +31,20 @@ export class MyWonkyClass {
                         return resolve(`${a.toUpperCase()} + ${b.toUpperCase()}`);
                     }
                     this.attempts += 1;
-                    return reject(new Error('no answer'));
+                    return reject(new RetryableError('no answer'));
                 },
+                100,
+            );
+        });
+    }
+
+    /**
+     * This method throws an error that is not supposed to be retried
+     */
+    public doSomethingNonRetryable = (_a: string, _b: string): Promise<string> => {
+        return new Promise((_resolve, reject) => {
+            setTimeout(
+                () => reject(new Error('non retryable error')),
                 1000,
             );
         });
