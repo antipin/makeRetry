@@ -15,7 +15,7 @@ export class MyWonkyClass {
             maxRetries,
             timeout,
             retryTimeout: (retryAttempt) => retryAttempt * 100,
-            RetryableErrorClass: RetryableError,
+            isRetryableError: error => error instanceof RetryableError,
         });
     }
 

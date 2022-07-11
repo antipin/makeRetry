@@ -4,7 +4,7 @@ type RetryOptions = {
     maxRetries?: number;
     timeout?: number;
     retryTimeout?: number | RetryTimeoutFn;
-    RetryableErrorClass?: any;
+    isRetryableError?: (error: unknown) => boolean;
 }
 
 type RetryableFn<Args extends Array<unknown>, Res> = (...args: Args) => Promise<Res>
@@ -14,7 +14,7 @@ export function makeRetryable<Args extends Array<unknown>, Res>(fn: RetryableFn<
         maxRetries = 3,
         timeout = 10_000,
         retryTimeout = 0,
-        RetryableErrorClass = Error,
+        isRetryableError = () => true,
     } = retryOptions;
     return function (...args: Args): Promise<Res> {
         return new Promise((resolve, reject) => {
@@ -47,7 +47,7 @@ export function makeRetryable<Args extends Array<unknown>, Res>(fn: RetryableFn<
                     console.log(`retry #${retriesCount} returned error:`, err);
                     lastError = err;
                     // Checking if the given error requires a retry
-                    if (err instanceof RetryableErrorClass) {
+                    if (isRetryableError(err)) {
                         // Calculating retry timeout
                         let waitForBeforeRetry = 0;
                         if (typeof retryTimeout === 'function') {
